@@ -137,15 +137,16 @@ class Branch {
 
   // Display the branch on the canvas
   show() {
-    // Set color based on depth of the branch
-    let colStart = color(255); // White for leaves
-    let colEnd = color(75, 0, 130); // Dark Purple for root
-    let lerpAmt = map(treeDepth - this.depth, 0, treeDepth, 0, 1);
-    let col = lerpColor(colStart, colEnd, lerpAmt);
-    
-    stroke(col);
-    strokeWeight(5);
-    line(this.start.x, this.start.y, this.current.x, this.current.y);
+    if (this.start.x >= 0 && this.start.x <= width && this.start.y >= 0 && this.start.y <= height) {
+      let colStart = color(255); // White for leaves
+      let colEnd = color(75, 0, 130); // Dark Purple for root
+      let lerpAmt = map(treeDepth - this.depth, 0, treeDepth, 0, 1);
+      let col = lerpColor(colStart, colEnd, lerpAmt);
+      
+      stroke(col);
+      strokeWeight(5);
+      line(this.start.x, this.start.y, this.current.x, this.current.y);
+    }
   }
 
   // Check if it's time to branch
@@ -153,16 +154,20 @@ class Branch {
     return this.finished && millis() % 1000 < 50 && this.depth > 0;
   }
 
+
   // Create a new branch from this branch
-  branch(right) {
-    let angleVariation = random(-PI / 12, PI / 12);
-    let angle = right ? PI / 6 : -PI / 6; // Angle for right or left branch
-    angle += angleVariation;
-    let dir = p5.Vector.sub(this.end, this.start);
-    dir.rotate(angle).mult(0.7);
-    let newEnd = p5.Vector.add(this.end, dir);
-    return new Branch(this.end, newEnd, this.depth - 1);
-  }
+branch(right) {
+  let angleVariation = random(-PI / 6, PI / 6); // Increased angle variation
+  let angle = right ? PI / 4 : -PI / 4; // Adjusted angle for right or left branch
+  angle += angleVariation;
+  let dir = p5.Vector.sub(this.end, this.start);
+  dir.rotate(angle).mult(random(0.7, 0.9)); // Adjusted length multiplier
+  let newEnd = p5.Vector.add(this.end, dir);
+  let newBranch = new Branch(this.end, newEnd, this.depth - 1);
+  newBranch.speed.rotate(angle); // Rotate the speed vector for proper growth direction
+  return newBranch;
+}
+
 }
 
 // Global variables for the sketch
@@ -171,6 +176,8 @@ let tree;
 let treeDepth = 5;
 let lastBranchTime = 0;
 let drawingStarted = false;
+let drawVortex = false;
+let arrows = [];
 
 // Set up the canvas and initialize objects
 function setup() {
@@ -179,9 +186,18 @@ function setup() {
   let end = createVector(width / 2, 350);
   tree = [new Branch(start, end, treeDepth)];
   textSize(36);
+  angleMode(DEGREES);
+  
+  // Initialize arrows for vortex effect
+  for (let i = 0; i < 1000; i++) {
+    arrows.push(new Arrow());
+  }
 }
 
 // Draw the sketch on each animation frame
+// Global variable to track if the circle should be drawn
+let drawArrow = false;
+
 function draw() {
   background(0);
   let currentTime = millis();
@@ -202,10 +218,9 @@ function draw() {
     equation.display();
   }
 
-  
   // Start drawing the binary search tree
-  if (drawingStarted) {
-    if (currentTime % 15000 < 50 && currentTime > 25000) { // Every 15 seconds, after 25 seconds
+  if (drawingStarted && currentTime < 40000) { // Stop after 40 seconds
+    if (currentTime % 5000 < 50 && currentTime > 25000) { // Every 5 seconds, after 25 seconds
       let startX = random(width);
       let startY = random(height);
       let start = createVector(startX, startY);
@@ -230,5 +245,65 @@ function draw() {
       branch.update();
       branch.show();
     }
+  } else if (currentTime >= 40000 && !drawArrow) {
+    drawArrow = true; // Set flag to start drawing the circle
+    tree = []; // Clear the tree array
+  }
+
+  // Draw circle as a placeholder
+  if (drawArrow) {
+    for (let arrow of arrows) {
+      arrow.update();
+      arrow.display();
+    }
+  }
+}
+
+// Function to toggle the vortex effect
+function keyPressed() {
+  if (key === 'V' || key === 'v') {
+    drawVortex = !drawVortex; // Toggle drawVortex when 'V' key is pressed
+  }
+}
+
+class Arrow {
+  constructor() {
+    this.pos = createVector(width/2, height/2);
+    this.angle = random(360);
+    this.scale = random(0.5, 1);
+    this.speed = createVector(random(-2, 2), random(-2, 2));
+
+    this.color = color(random(255), random(255), random(255), 150);
+  }
+
+  update() {
+    this.pos.add(this.speed);
+    this.angle += 2;
+  
+    // Bouncing logic
+    if (this.pos.x > width || this.pos.x < 0) {
+      this.speed.x *= -1;
+    }
+    if (this.pos.y > height || this.pos.y < 0) {
+      this.speed.y *= -1;
+    }
+  
+    let distance = dist(this.pos.x, this.pos.y, width / 2, height / 2);
+    if (distance > 100) {
+      this.scale = map(distance, 100, width / 2, 1, 0.5);
+    } else {
+      this.scale = map(distance, 0, 100, 1.5, 1);
+    }
+  }
+
+  display() {
+    push();
+    translate(this.pos.x, this.pos.y);
+    rotate(this.angle);
+    scale(this.scale);
+    fill(this.color);
+    noStroke();
+    triangle(-10, -5, 10, 0, -10, 5);
+    pop();
   }
 }
