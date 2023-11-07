@@ -115,76 +115,22 @@ class Equation {
   }
 }
 
-// The Branch class defines the properties and behaviors of the binary search tree branches.
-class Branch {
-  constructor(start, end, depth) {
-    this.start = start; // Starting point of the branch
-    this.end = end; // Ending point of the branch
-    this.depth = depth; // Depth of the branch in the tree
-    this.finished = false; // Flag to check if the branch has finished growing
-    this.current = start.copy(); // Current end point of the branch while it's growing
-    this.speed = p5.Vector.sub(end, start).div(25); // Speed and direction of growth
-  }
-
-  // Update the current position of the branch's end point
-  update() {
-    this.current.add(this.speed);
-    // Check if the branch has finished growing
-    if (p5.Vector.dist(this.current, this.end) < 1) {
-      this.finished = true;
-    }
-  }
-
-  // Display the branch on the canvas
-  show() {
-    if (this.start.x >= 0 && this.start.x <= width && this.start.y >= 0 && this.start.y <= height) {
-      let colStart = color(255); // White for leaves
-      let colEnd = color(75, 0, 130); // Dark Purple for root
-      let lerpAmt = map(treeDepth - this.depth, 0, treeDepth, 0, 1);
-      let col = lerpColor(colStart, colEnd, lerpAmt);
-      
-      stroke(col);
-      strokeWeight(5);
-      line(this.start.x, this.start.y, this.current.x, this.current.y);
-    }
-  }
-
-  // Check if it's time to branch
-  timeToBranch() {
-    return this.finished && millis() % 1000 < 50 && this.depth > 0;
-  }
-
-
-  // Create a new branch from this branch
-branch(right) {
-  let angleVariation = random(-PI / 6, PI / 6); // Increased angle variation
-  let angle = right ? PI / 4 : -PI / 4; // Adjusted angle for right or left branch
-  angle += angleVariation;
-  let dir = p5.Vector.sub(this.end, this.start);
-  dir.rotate(angle).mult(random(0.7, 0.9)); // Adjusted length multiplier
-  let newEnd = p5.Vector.add(this.end, dir);
-  let newBranch = new Branch(this.end, newEnd, this.depth - 1);
-  newBranch.speed.rotate(angle); // Rotate the speed vector for proper growth direction
-  return newBranch;
-}
-
-}
-
 // Global variables for the sketch
 let equations = [];
 let tree;
 let treeDepth = 5;
-let lastBranchTime = 0;
 let drawingStarted = false;
 let drawVortex = false;
 let arrows = [];
+let swervePath = [];
+let swerveDrawing = false;
+let swerveDestination;
+let swerveStart;
+
 
 // Set up the canvas and initialize objects
 function setup() {
   createCanvas(800, 800);
-  let start = createVector(width / 2, height / 2);
-  let end = createVector(width / 2, 350);
-  tree = [new Branch(start, end, treeDepth)];
   textSize(36);
   angleMode(DEGREES);
   
@@ -218,34 +164,21 @@ function draw() {
     equation.display();
   }
 
-  // Start drawing the binary search tree
   if (drawingStarted && currentTime < 40000) { // Stop after 40 seconds
-    if (currentTime % 5000 < 50 && currentTime > 25000) { // Every 5 seconds, after 25 seconds
-      let startX = random(width);
-      let startY = random(height);
-      let start = createVector(startX, startY);
-      let end = start.copy().add(p5.Vector.random2D().mult(50));
-      tree.push(new Branch(start, end, treeDepth));
+    if (!swerveDrawing) {
+      // Initialize the destination point and start point when drawing starts
+      swerveDestination = createVector(random(width), random(height));
+      swerveStart = createVector(mouseX, mouseY);
+      swervePath = [swerveStart];
+      swerveDrawing = true;
+    } else {
+      // If already drawing, update and display the swerve path
+      swerveUpdateAndDisplay();
     }
-    treeDepth = 5 + floor(currentTime / 10000);
-    let branchInterval = max(100, 1000 - currentTime / 5000); 
-    if (currentTime - lastBranchTime > branchInterval) {
-      for (let i = tree.length - 1; i >= 0; i--) {
-        let branch = tree[i];
-        if (branch.timeToBranch()) {
-          tree.push(branch.branch(true));
-          tree.push(branch.branch(false));
-          lastBranchTime = currentTime;
-        }
-      }
-    }
+  }
 
-    // Update and display branches
-    for (let branch of tree) {
-      branch.update();
-      branch.show();
-    }
-  } else if (currentTime >= 40000 && !drawArrow) {
+   if (currentTime >= 40000 && !drawArrow) {
+    drawingStarted = false;
     drawArrow = true; // Set flag to start drawing the circle
     tree = []; // Clear the tree array
   }
@@ -265,6 +198,49 @@ function keyPressed() {
     drawVortex = !drawVortex; // Toggle drawVortex when 'V' key is pressed
   }
 }
+
+// Function to update and display the swerve line
+function swerveUpdateAndDisplay() {
+  if (swerveDrawing) {
+    let currentPos = createVector(mouseX, mouseY);
+    let dir = p5.Vector.sub(swerveDestination, currentPos);
+    let distance = dir.mag();
+
+    // Swerve the line more drastically if it is close to the destination
+    if (distance < 200) { // Increased the distance for swerving to be more apparent
+      let swerveAngle = map(distance, 0, 200, PI / 2, 0); // Swerve by up to 90 degrees
+      dir.rotate(swerveAngle); // Apply the swerve
+    }
+
+    // Prevent the line from reaching the destination
+    if (distance < 20) {
+      dir.setMag(-5); // Push away from the destination
+    } else {
+      dir.setMag(3); // Continue drawing towards the mouse
+    }
+
+    // Apply the direction to the current position
+    currentPos.add(dir);
+    // Add the adjusted current position to the path
+    swervePath.push(currentPos);
+
+    // Draw the destination point
+    fill(0, 255, 0);
+    noStroke();
+    ellipse(swerveDestination.x, swerveDestination.y, 20, 20);
+
+    // Draw the swerve path
+    stroke(255);
+    strokeWeight(2);
+    noFill();
+    beginShape();
+    for (let p of swervePath) {
+      vertex(p.x, p.y);
+    }
+    endShape();
+  }
+}
+
 
 class Arrow {
   constructor() {
@@ -306,4 +282,16 @@ class Arrow {
     triangle(-10, -5, 10, 0, -10, 5);
     pop();
   }
+}
+
+// Override mousePressed and mouseReleased for swerve drawing
+function mousePressed() {
+  // Start swerve drawing
+  swerveDrawing = true;
+  swervePath = [createVector(mouseX, mouseY)];
+}
+
+function mouseReleased() {
+  // Stop swerve drawing
+  swerveDrawing = false;
 }
