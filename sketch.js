@@ -66,7 +66,6 @@ class Equation {
       "Coulomb's Law",
       "Schrodinger Equation",
       "Heisenberg Uncertainty Principle",
-      // Add more equations or concepts here
     ];
   
     // Return a random equation, concept, or algorithm from the array
@@ -125,6 +124,11 @@ let swerveDrawing = false;
 let swerveDestination;
 let swerveStart;
 let sceneNum = 0;
+let startTime = 0;
+let ballPos;
+let ballSpeed;
+let centerPos;
+let moving = true;
 
 
 // Set up the canvas and initialize objects
@@ -132,23 +136,23 @@ function setup() {
   createCanvas(800, 800);
   textSize(36);
   angleMode(DEGREES);
+  startTime = millis() + 15000;
+  ballPos = createVector(random(width, width - 50), random(height, height - 50));
+  ballSpeed = createVector(0, 0);
+  centerPos = createVector(width / 2, height / 2);
   
   // Initialize arrows for vortex effect
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < 4000; i++) {
     arrows.push(new Arrow());
   }
 }
 
-// Draw the sketch on each animation frame
-// Global variable to track if the circle should be drawn
 let drawArrow = false;
 
 function draw() {
   background(0);
-  let currentTime = millis();
 
-  // Control spawning and clearing of equations
-  if (sceneNum == 0) {
+  if (sceneNum === 0) {
     if (random(1) < 0.1) {
       equations.push(new Equation());
     }
@@ -162,7 +166,7 @@ function draw() {
     equation.display();
   }
 
-  if (sceneNum == 1) { 
+  if (sceneNum === 1) { 
     if (!swerveDrawing) {
       // Initialize the destination point and start point when drawing starts
       swerveDestination = createVector(random(width), random(height));
@@ -175,12 +179,31 @@ function draw() {
     }
   }
 
-  if (sceneNum == 2) {
-    for (let arrow of arrows) {
-      arrow.update();
-      arrow.display();
+  if (sceneNum === 2) {
+    if (moving) {
+      ballPos.x = lerp(ballPos.x, centerPos.x, 0.02);
+      ballPos.y = lerp(ballPos.y, centerPos.y, 0.02);
+      
+      if (p5.Vector.dist(ballPos, centerPos) < 1) {
+        moving = false; 
+      }
     }
-  }
+  
+    // Draw the ball
+    fill(255, 0, 0);
+    noStroke();
+    ellipse(ballPos.x, ballPos.y, 20, 20);
+
+    for (let arrow of arrows) {
+        arrow.display();
+    }
+        if (millis() >= startTime) {
+          // After 10 seconds, start updating arrow positions and angles
+          for (let arrow of arrows) {
+            arrow.update();
+          }
+        }
+      }
 }
 
 // Function to toggle the vortex effect
@@ -239,32 +262,26 @@ function swerveUpdateAndDisplay() {
   }
 }
 
-
-
-
-
 class Arrow {
   constructor() {
-    this.pos = createVector(width/2, height/2);
+    this.pos = createVector(random(width / 2 - 50, width / 2 + 50), random(height / 2 - 50, height / 2 + 50));
     this.angle = random(360);
     this.scale = random(0.5, 1);
-    this.speed = createVector(random(-2, 2), random(-2, 2));
-
+    this.speed = createVector(random(-9, 9), random(-9, 9));
     this.color = color(random(255), random(255), random(255), 150);
   }
 
   update() {
     this.pos.add(this.speed);
     this.angle += 2;
-  
-    // Bouncing logic
+
     if (this.pos.x > width || this.pos.x < 0) {
       this.speed.x *= -1;
     }
     if (this.pos.y > height || this.pos.y < 0) {
       this.speed.y *= -1;
     }
-  
+
     let distance = dist(this.pos.x, this.pos.y, width / 2, height / 2);
     if (distance > 100) {
       this.scale = map(distance, 100, width / 2, 1, 0.5);
@@ -288,6 +305,9 @@ class Arrow {
 function mousePressed() {
   swerveDrawing = true;
   swervePath = [createVector(mouseX, mouseY)];
+  if (sceneNum === 2) {
+    arrows.push(new Arrow());
+  }
 }
 
 function mouseReleased() {
