@@ -117,8 +117,6 @@ class Equation {
 
 // Global variables for the sketch
 let equations = [];
-let tree;
-let treeDepth = 5;
 let drawingStarted = false;
 let drawVortex = false;
 let arrows = [];
@@ -126,6 +124,7 @@ let swervePath = [];
 let swerveDrawing = false;
 let swerveDestination;
 let swerveStart;
+let sceneNum = 0;
 
 
 // Set up the canvas and initialize objects
@@ -149,13 +148,12 @@ function draw() {
   let currentTime = millis();
 
   // Control spawning and clearing of equations
-  if (currentTime < 25000) {
+  if (sceneNum == 0) {
     if (random(1) < 0.1) {
       equations.push(new Equation());
     }
-  } else if (!drawingStarted) {
+  } else if (sceneNum != 0) {
     equations = [];
-    drawingStarted = true;
   }
 
   // Update and display equations
@@ -164,7 +162,7 @@ function draw() {
     equation.display();
   }
 
-  if (drawingStarted && currentTime < 40000) { // Stop after 40 seconds
+  if (sceneNum == 1) { 
     if (!swerveDrawing) {
       // Initialize the destination point and start point when drawing starts
       swerveDestination = createVector(random(width), random(height));
@@ -177,14 +175,7 @@ function draw() {
     }
   }
 
-   if (currentTime >= 40000 && !drawArrow) {
-    drawingStarted = false;
-    drawArrow = true; // Set flag to start drawing the circle
-    tree = []; // Clear the tree array
-  }
-
-  // Draw circle as a placeholder
-  if (drawArrow) {
+  if (sceneNum == 2) {
     for (let arrow of arrows) {
       arrow.update();
       arrow.display();
@@ -194,40 +185,47 @@ function draw() {
 
 // Function to toggle the vortex effect
 function keyPressed() {
-  if (key === 'V' || key === 'v') {
-    drawVortex = !drawVortex; // Toggle drawVortex when 'V' key is pressed
+  if (key === 'S' || key === 's') {
+    sceneNum++;
+    if (sceneNum > 2) {
+      sceneNum = 0;
+    }
   }
+  
 }
 
-// Function to update and display the swerve line
 function swerveUpdateAndDisplay() {
   if (swerveDrawing) {
-    let currentPos = createVector(mouseX, mouseY);
-    let dir = p5.Vector.sub(swerveDestination, currentPos);
+    let mousePos = createVector(mouseX, mouseY);
+    let dir = p5.Vector.sub(swerveDestination, mousePos);
     let distance = dir.mag();
 
-    // Swerve the line more drastically if it is close to the destination
-    if (distance < 200) { // Increased the distance for swerving to be more apparent
-      let swerveAngle = map(distance, 0, 200, PI / 2, 0); // Swerve by up to 90 degrees
-      dir.rotate(swerveAngle); // Apply the swerve
+    let swerveStrength = map(distance, 0, 300, 50, 0); // Increase maximum swerve strength
+    let swerveAngle = swerveStrength * (PI / 180); // Convert swerve strength to radians
+
+    let currentPos = mousePos.copy(); // Use a copy of the mouse position
+
+    if (distance > 100) { // Apply swerve if not too close to the destination
+      dir.rotate(random(-swerveAngle, swerveAngle)); // Apply a random swerve within the angle range
+    } else { // When very close to the destination, swerve away sharply
+      let repulsion = p5.Vector.fromAngle(random(TWO_PI)).setMag(300 - distance);
+      currentPos.add(repulsion); // Modify the current position dramatically
     }
 
-    // Prevent the line from reaching the destination
-    if (distance < 20) {
-      dir.setMag(-5); // Push away from the destination
-    } else {
-      dir.setMag(3); // Continue drawing towards the mouse
-    }
-
-    // Apply the direction to the current position
+    dir.setMag(3); // Set a constant drawing speed towards the modified position
     currentPos.add(dir);
-    // Add the adjusted current position to the path
     swervePath.push(currentPos);
 
     // Draw the destination point
     fill(0, 255, 0);
     noStroke();
     ellipse(swerveDestination.x, swerveDestination.y, 20, 20);
+
+    // Draw the text
+    textAlign(CENTER, CENTER); // Align text to the center
+    fill(0,255,0); // Text Color
+    noStroke();
+    text("Draw a Very Simple Line!", swerveDestination.x, swerveDestination.y - 30);
 
     // Draw the swerve path
     stroke(255);
@@ -240,6 +238,9 @@ function swerveUpdateAndDisplay() {
     endShape();
   }
 }
+
+
+
 
 
 class Arrow {
@@ -284,14 +285,11 @@ class Arrow {
   }
 }
 
-// Override mousePressed and mouseReleased for swerve drawing
 function mousePressed() {
-  // Start swerve drawing
   swerveDrawing = true;
   swervePath = [createVector(mouseX, mouseY)];
 }
 
 function mouseReleased() {
-  // Stop swerve drawing
   swerveDrawing = false;
 }
